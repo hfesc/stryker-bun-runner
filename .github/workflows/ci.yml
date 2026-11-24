@@ -1,4 +1,4 @@
-name: CI
+name: CI Harness
 
 on:
   push:
@@ -7,12 +7,46 @@ on:
     branches: [main]
 
 jobs:
-  ci:
+  harness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js (for StrykerJS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.5"
-      - run: bun install --frozen-lockfile
-      - run: bun run harness
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (strict)
+        run: bun run typecheck
+
+      - name: Lint & Format (Biome)
+        run: bun run lint
+
+      - name: Build package
+        run: bun run build
+
+      - name: Unit & Integration Tests
+        run: bun run test:coverage
+
+      - name: Mutation testing (StrykerJS)
+        run: bun run mutate
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/mutation.json
+          if-no-files-found: ignore

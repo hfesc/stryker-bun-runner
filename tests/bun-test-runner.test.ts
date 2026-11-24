@@ -140,7 +140,12 @@ describe("BunTestRunner", () => {
       reloadEnvironment: true,
       testFilter: ["s::fails"],
     });
-    expect(killed.status).toBe(MutantRunStatus.Killed);
+    expect(killed).toMatchObject({
+      status: MutantRunStatus.Killed,
+      killedBy: ["s::fails"],
+      failureMessage: "bad",
+      nrOfTests: 1,
+    });
 
     // Hit limit reached -> Timeout
     const hitLimitRunner = new BunTestRunner(
@@ -213,5 +218,104 @@ test("e2e pass", () => { expect(1 + 1).toBe(2); });
       expect(res.tests[0]?.status).toBe(TestStatus.Success);
     }
     await runner.dispose();
+  });
+
+  test("handles dryRun timeout, error, and survived mutantRun cleanly", async () => {
+    const timeoutRunner = new BunTestRunner(
+      noopLogger,
+      makeOptions(),
+      async () => ({ exitCode: null, stdout: "", stderr: "", timedOut: true }),
+      "/tmp/preload.js",
+    );
+    const dryTimeout = await timeoutRunner.dryRun({
+      timeout: 250,
+      disableBail: true,
+      coverageAnalysis: "off",
+    });
+    expect(dryTimeout.status).toBe(DryRunStatus.Timeout);
+
+    const errRunner = new BunTestRunner(
+      noopLogger,
+      makeOptions(),
+      async () => ({ exitCode: 1, stdout: "", stderr: "SyntaxError", timedOut: false }),
+      "/tmp/preload.js",
+    );
+    const dryErr = await errRunner.dryRun({
+      timeout: 250,
+      disableBail: false,
+      coverageAnalysis: "off",
+    });
+    expect(dryErr).toEqual({ status: DryRunStatus.Error, errorMessage: "SyntaxError" });
+
+    // Thrown spawn error -> Error result in both dryRun and mutantRun
+    const throwRunner = new BunTestRunner(
+      noopLogger,
+      makeOptions({ bun: { env: { CUSTOM_VAR: "1" }, extraArgs: [] } }),
+      async (_cmd, args, env) => {
+        expect(args).not.toContain("--preload");
+        expect(env.CUSTOM_VAR).toBe("1");
+        throw new Error("ENOENT bun");
+      },
+      "/tmp/preload.js",
+    );
+    expect(
+      await throwRunner.dryRun({ timeout: 250, disableBail: false, coverageAnalysis: "off" }),
+    ).toEqual({ status: DryRunStatus.Error, errorMessage: "ENOENT bun" });
+
+    const throwMutantRunner = new BunTestRunner(
+      noopLogger,
+      makeOptions(),
+      async () => {
+        throw new Error("spawn failed");
+      },
+      "/tmp/preload.js",
+    );
+    expect(
+      await throwMutantRunner.mutantRun({
+        timeout: 250,
+        disableBail: false,
+        activeMutant: {
+          id: "8",
+          fileName: "src/a.ts",
+          location: { start: { line: 1, column: 0 }, end: { line: 1, column: 2 } },
+          mutatorName: "BooleanLiteral",
+          replacement: "false",
+        },
+        sandboxFileName: "src/a.ts",
+        mutantActivation: "runtime",
+        reloadEnvironment: false,
+      }),
+    ).toEqual({ status: MutantRunStatus.Error, errorMessage: "spawn failed" });
+
+    const survivedRunner = new BunTestRunner(
+      noopLogger,
+      makeOptions(),
+      async (_cmd, args) => {
+        expect(args).not.toContain("--bail=1");
+        const outfile = args.find((a) => a.startsWith("--reporter-outfile="))?.split("=")[1] ?? "";
+        writeFileSync(
+          outfile,
+          `<testsuite><testcase name="passes" classname="s" time="0.01"/></testsuite>`,
+          "utf8",
+        );
+        return { exitCode: 0, stdout: "", stderr: "", timedOut: false };
+      },
+      "/tmp/preload.js",
+    );
+    const survived = await survivedRunner.mutantRun({
+      timeout: 5000,
+      disableBail: true,
+      activeMutant: {
+        id: "7",
+        fileName: "src/a.ts",
+        location: { start: { line: 1, column: 0 }, end: { line: 1, column: 2 } },
+        mutatorName: "BooleanLiteral",
+        replacement: "false",
+      },
+      sandboxFileName: "src/a.ts",
+      mutantActivation: "runtime",
+      reloadEnvironment: false,
+    });
+    expect(survived.status).toBe(MutantRunStatus.Survived);
   });
 });

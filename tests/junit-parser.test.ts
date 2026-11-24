@@ -45,7 +45,11 @@ describe("parseJunitXml", () => {
   });
 
   test("handles error tags and self-closing failures", () => {
-    const xml = `<testsuite><testcase name="boom" time="0.1"><error message="Crash" /></testcase></testsuite>`;
+    const xml = `<testsuite>
+      <testcase name="boom" time="0.1"><error message="Crash" /></testcase>
+      <testcase name="same" time="0.02"><failure message="Dup">Dup</failure></testcase>
+      <testcase name="bare" time="bad"><failure /></testcase>
+    </testsuite>`;
     const results = parseJunitXml(xml);
     expect(results).toEqual([
       {
@@ -55,6 +59,22 @@ describe("parseJunitXml", () => {
         timeSpentMs: 100,
         fileName: undefined,
         failureMessage: "Crash",
+      },
+      {
+        id: "same",
+        name: "same",
+        status: TestStatus.Failed,
+        timeSpentMs: 20,
+        fileName: undefined,
+        failureMessage: "Dup",
+      },
+      {
+        id: "bare",
+        name: "bare",
+        status: TestStatus.Failed,
+        timeSpentMs: 0,
+        fileName: undefined,
+        failureMessage: "Test failed",
       },
     ]);
   });
