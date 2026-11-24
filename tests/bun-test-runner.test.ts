@@ -318,4 +318,143 @@ test("e2e pass", () => { expect(1 + 1).toBe(2); });
     });
     expect(survived.status).toBe(MutantRunStatus.Survived);
   });
+
+  test("enforces timeout calculations, error fallbacks, hitLimit env, malformed reports, and dispose log", async () => {
+    const debugLogs: string[] = [];
+    const logger: Logger = { ...noopLogger, debug: (msg: string) => debugLogs.push(msg) };
+
+    const timeouts: number[] = [];
+    const runner = new BunTestRunner(
+      logger,
+      makeOptions(),
+      async (_cmd, args, env, timeoutMs) => {
+        timeouts.push(timeoutMs);
+        expect(args).not.toContain("--config");
+        expect(env.__STRYKER_HIT_LIMIT__).toBeUndefined();
+        if (env.__STRYKER_REPORT_PATH__) {
+          writeFileSync(env.__STRYKER_REPORT_PATH__, "{invalid json", "utf8");
+        }
+        expect(args).toContain("--preload");
+        return { exitCode: 2, stdout: "  stdout err  ", stderr: "   ", timedOut: false };
+      },
+      "/tmp/preload.js",
+    );
+
+    const dryStdoutErr = await runner.dryRun({
+      timeout: 100,
+      disableBail: false,
+      coverageAnalysis: "all",
+    });
+    expect(dryStdoutErr).toEqual({ status: DryRunStatus.Error, errorMessage: "stdout err" });
+    expect(timeouts[0]).toBe(2100);
+
+    const mutantStdoutErr = await runner.mutantRun({
+      timeout: 5000,
+      disableBail: false,
+      activeMutant: {
+        id: "42",
+        fileName: "src/a.ts",
+        location: { start: { line: 1, column: 0 }, end: { line: 1, column: 2 } },
+        mutatorName: "BooleanLiteral",
+        replacement: "false",
+      },
+      sandboxFileName: "src/a.ts",
+      mutantActivation: "runtime",
+      reloadEnvironment: false,
+    });
+    expect(mutantStdoutErr).toEqual({
+      status: MutantRunStatus.Error,
+      errorMessage: "stdout err",
+    });
+    expect(timeouts[1]).toBe(7000);
+
+    const fallbackRunner = new BunTestRunner(
+      logger,
+      makeOptions(),
+      async () => ({ exitCode: 3, stdout: "  ", stderr: "  ", timedOut: false }),
+      "/tmp/preload.js",
+    );
+    expect(
+      await fallbackRunner.dryRun({ timeout: 500, disableBail: false, coverageAnalysis: "off" }),
+    ).toEqual({ status: DryRunStatus.Error, errorMessage: "bun test exited with 3" });
+    expect(
+      await fallbackRunner.mutantRun({
+        timeout: 500,
+        disableBail: false,
+        activeMutant: {
+          id: "9",
+          fileName: "src/a.ts",
+          location: { start: { line: 1, column: 0 }, end: { line: 1, column: 2 } },
+          mutatorName: "BooleanLiteral",
+          replacement: "false",
+        },
+        sandboxFileName: "src/a.ts",
+        mutantActivation: "runtime",
+        reloadEnvironment: false,
+      }),
+    ).toEqual({ status: MutantRunStatus.Error, errorMessage: "bun test exited with 3" });
+
+    // Timeout messages and real spawn error path
+    const timeoutMsgRunner = new BunTestRunner(
+      logger,
+      makeOptions(),
+      async () => ({ exitCode: null, stdout: "", stderr: "", timedOut: true }),
+      "/tmp/preload.js",
+    );
+    expect(
+      await timeoutMsgRunner.dryRun({ timeout: 250, disableBail: false, coverageAnalysis: "off" }),
+    ).toEqual({ status: DryRunStatus.Timeout, reason: "Bun test timed out after 250ms" });
+    expect(
+      await timeoutMsgRunner.mutantRun({
+        timeout: 100,
+        disableBail: false,
+        activeMutant: {
+          id: "42",
+          fileName: "src/a.ts",
+          location: { start: { line: 1, column: 0 }, end: { line: 1, column: 2 } },
+          mutatorName: "BooleanLiteral",
+          replacement: "false",
+        },
+        sandboxFileName: "src/a.ts",
+        mutantActivation: "runtime",
+        reloadEnvironment: false,
+      }),
+    ).toEqual({
+      status: MutantRunStatus.Timeout,
+      reason: "Mutant #42 timed out after 100ms",
+    });
+
+    const badBinRunner = new BunTestRunner(
+      logger,
+      makeOptions({ bun: { bunPath: "/nonexistent-bun-binary-xyz" } }),
+    );
+    const spawnErrRes = await badBinRunner.dryRun({
+      timeout: 500,
+      disableBail: false,
+      coverageAnalysis: "off",
+    });
+    expect(spawnErrRes.status).toBe(DryRunStatus.Error);
+
+    const prevBunPath = process.env.BUN_PATH;
+    process.env.BUN_PATH = process.execPath;
+    try {
+      const envRunner = new BunTestRunner(
+        logger,
+        makeOptions({ bun: { extraArgs: ["--bail=1"] } }),
+      );
+      const envRes = await envRunner.dryRun({
+        timeout: 1000,
+        disableBail: false,
+        coverageAnalysis: "off",
+        testFiles: ["nonexistent-file-xyz.test.ts"],
+      });
+      expect(envRes.status).toBe(DryRunStatus.Error);
+    } finally {
+      if (prevBunPath === undefined) delete process.env.BUN_PATH;
+      else process.env.BUN_PATH = prevBunPath;
+    }
+
+    await runner.dispose();
+    expect(debugLogs).toEqual(["Disposed BunTestRunner"]);
+  });
 });

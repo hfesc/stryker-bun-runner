@@ -44,17 +44,20 @@ describe("parseJunitXml", () => {
     ]);
   });
 
-  test("handles error tags and self-closing failures", () => {
+  test("handles error tags, inner-only failures, missing attrs, and all XML entities", () => {
     const xml = `<testsuite>
-      <testcase name="boom" time="0.1"><error message="Crash" /></testcase>
+      <testcase name="boom &lt;tag&gt; &apos;x&apos;" time="0.1"><error message="Crash" /></testcase>
       <testcase name="same" time="0.02"><failure message="Dup">Dup</failure></testcase>
+      <testcase name="inner" time="0.01"><failure>  trimmed inner  </failure></testcase>
+      <testcase />
+      <testcase name="empty-fail"><failure></failure></testcase>
       <testcase name="bare" time="bad"><failure /></testcase>
     </testsuite>`;
     const results = parseJunitXml(xml);
     expect(results).toEqual([
       {
-        id: "boom",
-        name: "boom",
+        id: "boom <tag> 'x'",
+        name: "boom <tag> 'x'",
         status: TestStatus.Failed,
         timeSpentMs: 100,
         fileName: undefined,
@@ -67,6 +70,29 @@ describe("parseJunitXml", () => {
         timeSpentMs: 20,
         fileName: undefined,
         failureMessage: "Dup",
+      },
+      {
+        id: "inner",
+        name: "inner",
+        status: TestStatus.Failed,
+        timeSpentMs: 10,
+        fileName: undefined,
+        failureMessage: "trimmed inner",
+      },
+      {
+        id: "unnamed",
+        name: "unnamed",
+        status: TestStatus.Success,
+        timeSpentMs: 0,
+        fileName: undefined,
+      },
+      {
+        id: "empty-fail",
+        name: "empty-fail",
+        status: TestStatus.Failed,
+        timeSpentMs: 0,
+        fileName: undefined,
+        failureMessage: "Test failed",
       },
       {
         id: "bare",
@@ -83,8 +109,9 @@ describe("parseJunitXml", () => {
 describe("buildTestNameFilterRegex", () => {
   test("builds escaped alternation regex from test ids", () => {
     expect(buildTestNameFilterRegex([])).toBeUndefined();
-    expect(buildTestNameFilterRegex(["suite::adds (1+2)", "plain [test]"])).toBe(
-      "adds \\(1\\+2\\)|plain \\[test\\]",
+    expect(buildTestNameFilterRegex(["  ", "::"])).toBeUndefined();
+    expect(buildTestNameFilterRegex(["::leading", "suite::adds (1+2)", "plain [test]"])).toBe(
+      "leading|adds \\(1\\+2\\)|plain \\[test\\]",
     );
   });
 });

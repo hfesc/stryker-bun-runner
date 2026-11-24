@@ -38,7 +38,7 @@
     "lint:fix": "biome check --write .",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
-    "mutate": "stryker run",
+    "mutate": "stryker run && bun -e 'const r = await Bun.file(\"reports/mutation/mutation.json\").json(); const nc = Object.values(r.files).flatMap(f => f.mutants).filter(m => m.status === \"NoCoverage\").length; if (nc > 0) { console.error(\"NoCoverage mutants:\", nc); process.exit(1); }'",
     "harness": "bun run typecheck && bun run lint && bun run build && bun test",
     "release": "release-it",
     "release:dry": "release-it --dry-run"
