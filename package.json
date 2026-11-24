@@ -1,0 +1,50 @@
+{
+  "name": "stryker-bun-runner",
+  "version": "0.1.0",
+  "description": "Fast StrykerJS TestRunner plugin for Bun test with JUnit reporting, bail, test filtering, hitLimit protection, and mutant coverage analysis",
+  "keywords": [
+    "stryker",
+    "stryker-plugin",
+    "stryker-test-runner",
+    "bun",
+    "mutation-testing"
+  ],
+  "license": "MIT",
+  "author": "Hugo Felipe Camilo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hfesc/stryker-bun-runner.git"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src/schema.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp src/schema.json dist/schema.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "bun test",
+    "harness": "bun run typecheck && bun run lint && bun run build && bun test"
+  },
+  "peerDependencies": {
+    "@stryker-mutator/api": "^10.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "@stryker-mutator/api": "^10.1.1",
+    "@types/bun": "latest",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BunTestRunnerOptions",
+  "type": "object",
+  "properties": {
+    "bun": {
+      "type": "object",
+      "description": "Configuration for the stryker-bun-runner plugin.",
+      "properties": {
+        "bunPath": {
+          "type": "string",
+          "description": "Path to the bun executable (defaults to 'bun')."
+        },
+        "testFiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific test file patterns to pass to 'bun test'."
+        },
+        "configFile": {
+          "type": "string",
+          "description": "Optional path to bunfig.toml passed via --config."
+        },
+        "extraArgs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Additional CLI flags passed to 'bun test'."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Extra environment variables for bun test runs."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
