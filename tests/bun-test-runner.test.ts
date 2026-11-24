@@ -330,6 +330,9 @@ test("e2e pass", () => { expect(1 + 1).toBe(2); });
       async (_cmd, args, env, timeoutMs) => {
         timeouts.push(timeoutMs);
         expect(args).not.toContain("--config");
+        expect(args).toContain(
+          `--timeout=${Math.max(1, Math.ceil(timeouts.length === 1 ? 100.4 : 5000))}`,
+        );
         expect(env.__STRYKER_HIT_LIMIT__).toBeUndefined();
         if (env.__STRYKER_REPORT_PATH__) {
           writeFileSync(env.__STRYKER_REPORT_PATH__, "{invalid json", "utf8");
@@ -341,12 +344,12 @@ test("e2e pass", () => { expect(1 + 1).toBe(2); });
     );
 
     const dryStdoutErr = await runner.dryRun({
-      timeout: 100,
+      timeout: 100.4,
       disableBail: false,
       coverageAnalysis: "all",
     });
     expect(dryStdoutErr).toEqual({ status: DryRunStatus.Error, errorMessage: "stdout err" });
-    expect(timeouts[0]).toBe(2100);
+    expect(timeouts[0]).toBe(2100.4);
 
     const mutantStdoutErr = await runner.mutantRun({
       timeout: 5000,

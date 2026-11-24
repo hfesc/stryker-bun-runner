@@ -277,7 +277,7 @@ export class BunTestRunner implements TestRunner {
       "test",
       "--reporter=junit",
       `--reporter-outfile=${params.junitPath}`,
-      `--timeout=${params.timeoutMs}`,
+      `--timeout=${Math.max(1, Math.ceil(params.timeoutMs))}`,
     ];
 
     if (!params.disableBail) {
