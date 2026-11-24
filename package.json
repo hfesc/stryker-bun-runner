@@ -1,6 +1,6 @@
 {
   "name": "stryker-bun-runner",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fast StrykerJS TestRunner plugin for Bun test with JUnit reporting, bail, test filtering, hitLimit protection, and mutant coverage analysis",
   "keywords": [
     "stryker",
