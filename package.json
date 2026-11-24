@@ -32,6 +32,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && cp src/schema.json dist/schema.json",
+    "prepare": "tsc -p tsconfig.build.json && cp src/schema.json dist/schema.json",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
