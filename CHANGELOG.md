@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1](https://github.com/hfesc/stryker-bun-runner/compare/v0.2.0...v0.2.1) (2026-11-24)
+
+### Bug Fixes
+
+* round --timeout to integer ms for bun test ([8a8e471](https://github.com/hfesc/stryker-bun-runner/commit/8a8e4716c2c2e53bfd51b3a4046f76e51ea9826b))
+
 ## 0.2.0 (2026-11-24)
 
 ### Features
